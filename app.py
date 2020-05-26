@@ -6,6 +6,7 @@ from dash.dependencies import Input, Output, State
 import pandas as pd
 import numpy as np
 import plotly.graph_objs as go
+import json
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -22,7 +23,6 @@ server = app.server
 demo_kernel = np.array([1, 2, 1])
 
 def add_dila_to_kernel(weights, dilation):
-    
     kernel_length = len(weights) + (len(weights) - 1) * dilation
     kernel = np.zeros(kernel_length)
     kernel_length = kernel.shape[0]
@@ -35,7 +35,7 @@ def add_dila_to_kernel(weights, dilation):
             sup += 1
     return kernel
 
-def apply_kernel(ts, weights, bias, dilation, padding, stride):
+def apply_kernel(ts, kernel, bias, padding, stride):
 
     # if padding > 0:
     #     _input_length = len(ts)
@@ -44,7 +44,7 @@ def apply_kernel(ts, weights, bias, dilation, padding, stride):
     #     X = _X
 
     # Add padding to kernel
-    kernel = add_dila_to_kernel(weights, dilation)
+    # kernel = add_dila_to_kernel(weights, dilation)
     print(kernel)
 
     kernel_length = kernel.shape[0]
@@ -109,42 +109,53 @@ def plot_ts(json_data):
 
 
 @app.callback(
-    Output(component_id='kernel_plot', component_property='figure'),
+    Output(component_id='current-kernel', component_property='children'),
     [Input(component_id='kernel_weights', component_property='value'),
-     # Input(component_id='kernel_bias', component_property='value'),
+     Input(component_id='kernel_centering_chkb', component_property='value'),
      Input(component_id='kernel_dilation', component_property='value'),
-     # Input(component_id='kernel_stride', component_property='value'),
-     ]
-)
-def plot_kernel(kernel, dilation):
+     ])
+def prepare_kernel(kernel, kc_ckhkb, dilation):
     dilation = int(dilation)
-    kernel = np.array(kernel.split(','))
+    kernel = np.array(list(map(float, kernel.split(','))))
+    if 'center' in kc_ckhkb:
+        mean = np.mean(kernel)
+        kernel = kernel - mean
     dila_kernel = add_dila_to_kernel(kernel, dilation)
-    layout = {'title': {'text':f'Kernel: {dila_kernel}'}}
+    ret ={'original_kernel': kernel.tolist(),
+          'dila_kernel': dila_kernel.tolist()}
+    return json.dumps(ret)
+
+
+@app.callback(
+    Output(component_id='kernel_plot', component_property='figure'),
+    [Input(component_id='current-kernel', component_property='children'),]
+)
+def plot_kernel(kernel_json):
+    kernel_json = json.loads(kernel_json)
+    kernel = np.array(kernel_json['original_kernel'])
+    dila_kernel = np.array(kernel_json['dila_kernel'])
+    layout = {'title': {'text':f'Kernel: {kernel}\n Dilated kernel: {dila_kernel}'}}
     return go.Figure(data=[go.Scatter(y=kernel)], layout=layout)
 
 
 @app.callback(
     Output(component_id='ts_trans_plot', component_property='figure'),
     [Input(component_id='current-TS', component_property='children'),
-     Input(component_id='kernel_weights', component_property='value'),
+     Input(component_id='current-kernel', component_property='children'),
      Input(component_id='kernel_bias', component_property='value'),
-     Input(component_id='kernel_dilation', component_property='value'),
      Input(component_id='kernel_padding', component_property='value'),
      Input(component_id='kernel_stride', component_property='value'),
      ]
 )
-def plot_trans_ts(json_data, kernel, bias, dilatation, padding, stride):
+def plot_trans_ts(json_data, kernel, bias, padding, stride):
 
     dff = pd.read_json(json_data, orient='values').to_numpy().flatten()
-    kernel = np.array(list(map(float, kernel.split(','))))
+    kernel = np.array(json.loads(kernel)['dila_kernel'])
     print(kernel)
-    dilatation = int(dilatation)
     bias = float(bias)
     padding = int(padding)
     stride = int(stride)
-    # transformed = apply_transformation(data[ts_idx,:])
-    transformed = apply_kernel(dff, kernel, bias, dilatation, padding, stride)
+    transformed = apply_kernel(dff, kernel, bias, padding, stride)
     layout = {'title': {'text':'Transformed time series'}}
     return go.Figure(data=[go.Scatter(y=transformed)], layout=layout)
 
@@ -153,6 +164,7 @@ app.layout = html.Div(children=[
     html.H4(children='TS kernel visualization'),
     # Div to store the current TS
     html.Div(id='current-TS', style={'display': 'none'}),
+    html.Div(id='current-kernel', style={'display': 'none'}),
 
     # Time series plot
     html.Div([
@@ -161,7 +173,7 @@ app.layout = html.Div(children=[
                 dcc.Checklist(
                     options=[
                         {'label': 'Normalize', 'value': 'norm'},
-                        {'label': 'Test sequence', 'value': 'test'},
+                        {'label': 'Use test time series', 'value': 'test'},
                     ],
                     value=[],
                     id='ts-chkb'
@@ -169,7 +181,6 @@ app.layout = html.Div(children=[
 
             # Test time series
             html.Div(children=[
-                html.H5(children='Test time serie'),
                 dcc.Input(
                     id="test-ts",
                     placeholder='Enter your test time series',
@@ -203,7 +214,15 @@ app.layout = html.Div(children=[
                     type='text',
                     value='1,2,1',
                     debounce=True
-                )]),
+                ),
+                dcc.Checklist(
+                    id="kernel_centering_chkb",
+                    options=[
+                        {'label': 'Center kernel', 'value': 'center'}
+                        ],
+                    value=[],
+                ),
+            ]),
             # Kernel bias
             html.Div(children=[
                 html.H5(children='Bias'),
