@@ -17,7 +17,7 @@ data = pd.DataFrame(np.loadtxt(datafile, delimiter=',')[:, 1:].T)
 print(data.shape)
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-
+server = app.server
 
 demo_kernel = np.array([1, 2, 1])
 
@@ -52,31 +52,48 @@ def apply_kernel(ts, weights, bias, dilation, padding, stride):
     input_length = ts.shape[0]
     length_diff = input_length - kernel_length
     output_length = ((length_diff) // stride) + 1
-                     
 
     output = np.empty(output_length)
 
     for i in range(0, output_length):
         _sum = bias
         for j in range(0, kernel_length, stride):
+            print(kernel[j])
             s = kernel[j] * ts[i + j]
+            print(s)
             _sum += s
-        output[i] = _sum
+            output[i] = _sum
 
     print(output_length)
     print(input_length)
     print(kernel_length)
+    print(output)
     return output
+
+
+def noramlize(ts):
+    ts = (ts-ts.mean())/ts.std()
+    return ts
 
 
 @app.callback(
     Output(component_id='current-TS', component_property='children'),
-    [Input(component_id='ts_select', component_property='value')]
+    [Input(component_id='ts_select', component_property='value'),
+     Input(component_id='ts-chkb', component_property='value'),
+     Input(component_id='test-ts', component_property='value'),
+     ]
 )
-def prepare_ts(ts_idx):
-    ts_idx = int(ts_idx)
-    ts = data[ts_idx]
-    print(ts)
+def prepare_ts(ts_idx, chk_list, test_ts):
+    if 'test' in chk_list:
+        ts = np.array(list(map(float, test_ts.split(','))))
+        ts = pd.DataFrame(ts)
+    else:
+        ts_idx = int(ts_idx)
+        ts = data[ts_idx]
+
+    if 'norm' in chk_list:
+        ts = noramlize(ts)
+
     return ts.to_json(orient='values')
 
 
@@ -120,23 +137,47 @@ def plot_kernel(kernel, dilation):
 def plot_trans_ts(json_data, kernel, bias, dilatation, padding, stride):
 
     dff = pd.read_json(json_data, orient='values').to_numpy().flatten()
-    kernel = np.array(kernel.split(','))
+    kernel = np.array(list(map(float, kernel.split(','))))
     print(kernel)
     dilatation = int(dilatation)
     bias = float(bias)
     padding = int(padding)
     stride = int(stride)
     # transformed = apply_transformation(data[ts_idx,:])
-    transformed = apply_kernel(dff, demo_kernel, bias, dilatation, padding, stride)
+    transformed = apply_kernel(dff, kernel, bias, dilatation, padding, stride)
     layout = {'title': {'text':'Transformed time series'}}
     return go.Figure(data=[go.Scatter(y=transformed)], layout=layout)
 
 
 app.layout = html.Div(children=[
     html.H4(children='TS kernel visualization'),
+    # Div to store the current TS
     html.Div(id='current-TS', style={'display': 'none'}),
+
+    # Time series plot
     html.Div([
-        html.Div(["t "], className="two columns"),
+        html.Div([
+            html.Div(children=[
+                dcc.Checklist(
+                    options=[
+                        {'label': 'Normalize', 'value': 'norm'},
+                        {'label': 'Test sequence', 'value': 'test'},
+                    ],
+                    value=[],
+                    id='ts-chkb'
+                )]),
+
+            # Test time series
+            html.Div(children=[
+                html.H5(children='Test time serie'),
+                dcc.Input(
+                    id="test-ts",
+                    placeholder='Enter your test time series',
+                    type='text',
+                    value='1,1,1,1,1,1,1,1,1,1,1,1,1',
+                    debounce=True
+                )])],
+            className="two columns"),
         html.Div([
             html.H6(["Select time series"]),
             dcc.Slider(
@@ -185,7 +226,7 @@ app.layout = html.Div(children=[
                 )]),
             # Kernel padding
             html.Div(children=[
-                html.H5(children='Padding (not impl)'),
+                html.H5(children='Padding (not impl.)'),
                 dcc.Input(
                     id="kernel_padding",
                     placeholder='Enter your padding',
