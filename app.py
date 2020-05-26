@@ -19,7 +19,7 @@ print(data.shape)
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
-
+app.title = "KernelViz"
 demo_kernel = np.array([1, 2, 1])
 
 def add_dila_to_kernel(weights, dilation):
