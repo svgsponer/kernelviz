@@ -11,7 +11,10 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
-data = np.loadtxt('data/CMJ/JumpResampled/JumpResampled_TRAIN', delimiter=',')[:,1:]
+datafile='data/CMJ/JumpResampled/JumpResampled_TRAIN'
+#datafile='../data/1M-TSC-SITS_2006_NDVI_C/SITS1M_fold1/SITS1M_fold1_TRAIN.csv'
+data = pd.DataFrame(np.loadtxt(datafile, delimiter=',')[:, 1:].T)
+print(data.shape)
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
@@ -67,13 +70,26 @@ def apply_kernel(ts, weights, bias, dilation, padding, stride):
 
 
 @app.callback(
-    Output(component_id='ts_plot', component_property='figure'),
+    Output(component_id='current-TS', component_property='children'),
     [Input(component_id='ts_select', component_property='value')]
 )
-def plot_ts(ts_idx):
+def prepare_ts(ts_idx):
     ts_idx = int(ts_idx)
-    layout = {'title': {'text':f"Time series {ts_idx}"}}
-    return go.Figure(data=[go.Scatter(y=data[ts_idx, :])], layout=layout)
+    ts = data[ts_idx]
+    print(ts)
+    return ts.to_json(orient='values')
+
+
+@app.callback(
+    Output(component_id='ts_plot', component_property='figure'),
+    [Input(component_id='current-TS', component_property='children')]
+)
+def plot_ts(json_data):
+    dff = pd.read_json(json_data, orient='values').to_numpy().flatten()
+    print(dff)
+    layout = {'title': {'text': f"Time series"}}
+    return go.Figure(data=[go.Scatter(y=dff)])
+
 
 @app.callback(
     Output(component_id='kernel_plot', component_property='figure'),
@@ -93,7 +109,7 @@ def plot_kernel(kernel, dilation):
 
 @app.callback(
     Output(component_id='ts_trans_plot', component_property='figure'),
-    [Input(component_id='ts_select', component_property='value'),
+    [Input(component_id='current-TS', component_property='children'),
      Input(component_id='kernel_weights', component_property='value'),
      Input(component_id='kernel_bias', component_property='value'),
      Input(component_id='kernel_dilation', component_property='value'),
@@ -101,8 +117,9 @@ def plot_kernel(kernel, dilation):
      Input(component_id='kernel_stride', component_property='value'),
      ]
 )
-def plot_trans_ts(ts_idx, kernel, bias, dilatation, padding, stride):
-    ts_idx = int(ts_idx)
+def plot_trans_ts(json_data, kernel, bias, dilatation, padding, stride):
+
+    dff = pd.read_json(json_data, orient='values').to_numpy().flatten()
     kernel = np.array(kernel.split(','))
     print(kernel)
     dilatation = int(dilatation)
@@ -110,23 +127,22 @@ def plot_trans_ts(ts_idx, kernel, bias, dilatation, padding, stride):
     padding = int(padding)
     stride = int(stride)
     # transformed = apply_transformation(data[ts_idx,:])
-    transformed = apply_kernel(data[ts_idx,:], demo_kernel, bias, dilatation, padding, stride)
-    print(transformed[:5])
-    print(data[ts_idx, :5])
+    transformed = apply_kernel(dff, demo_kernel, bias, dilatation, padding, stride)
     layout = {'title': {'text':'Transformed time series'}}
     return go.Figure(data=[go.Scatter(y=transformed)], layout=layout)
 
 
 app.layout = html.Div(children=[
     html.H4(children='TS kernel visualization'),
+    html.Div(id='current-TS', style={'display': 'none'}),
     html.Div([
-        html.Div([], className="two columns"),
+        html.Div(["t "], className="two columns"),
         html.Div([
             html.H6(["Select time series"]),
             dcc.Slider(
                 id='ts_select',
                 min=-0,
-                max=data.shape[1],
+                max=data.shape[0],
                 step=1,
                 value=0
             ),
@@ -192,9 +208,13 @@ app.layout = html.Div(children=[
                 id="kernel_plot",),],className="ten columns"),
     ], className="row"),
 
-    dcc.Graph(
-        id="ts_trans_plot")
-
+    html.Div([
+        html.Div(["t "], className="two columns"),
+        html.Div([
+            dcc.Graph(
+                id="ts_trans_plot")
+        ], className="ten columns"),
+    ], className="row"),
 ])
 
 if __name__ == '__main__':
