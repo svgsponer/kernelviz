@@ -104,8 +104,8 @@ def prepare_ts(ts_idx, chk_list, test_ts):
 def plot_ts(json_data):
     dff = pd.read_json(json_data, orient='values').to_numpy().flatten()
     print(dff)
-    layout = {'title': {'text': f"Time series"}}
-    return go.Figure(data=[go.Scatter(y=dff)])
+    layout = {'title': {'text': "Time series"}}
+    return go.Figure(data=[go.Scatter(y=dff)], layout=layout)
 
 
 @app.callback(
