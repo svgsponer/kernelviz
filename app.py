@@ -140,7 +140,6 @@ def upload_data(list_of_contents):
     else:
         print("Load default dataset")
         datafile='data/CMJ/JumpResampled/JumpResampled_TRAIN'
-        #datafile='../data/1M-TSC-SITS_2006_NDVI_C/SITS1M_fold1/SITS1M_fold1_TRAIN.csv'
         data = pd.DataFrame(np.loadtxt(datafile, delimiter=',')[:, 1:].T)
     print(data.shape)
     return data.to_json(orient='values'), data.shape[1]-1, 0
