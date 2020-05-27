@@ -39,6 +39,15 @@ def update_test_ts_style(use_test_ts):
 
 
 @app.callback(
+    dash.dependencies.Output('ts-slider-output-container', 'children'),
+    [dash.dependencies.Input('ts-select', 'value')])
+def update_output_ts_input(value):
+    return "{}".format(value)
+
+
+# Could be split as a change in normalize should not need to reread the full
+# dataset but only the currently selected ts
+@app.callback(
     Output(component_id='current-TS', component_property='children'),
     [Input(component_id='ts-select', component_property='value'),
      Input(component_id='normalize_ts_switch', component_property='on'),
@@ -59,7 +68,6 @@ def prepare_ts(ts_idx, do_normalize, do_use_test_ts, test_ts, data_json):
 
     if do_normalize:
         ts = utls.noramlize(ts)
-
     return ts.to_json(orient='values')
 
 
@@ -216,6 +224,11 @@ app.layout = html.Div(children=[
                             min=-0,
                             step=1,
                             value=0),
+                        html.Div(id='ts-slider-output-container',
+                                 style={
+                                     'width': '100%',
+                                     'textAlign': 'center'}
+                                 ),
                     ]),
             ],
                      style={'margin-top': '1em'},)
