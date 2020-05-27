@@ -10,6 +10,7 @@ import plotly.graph_objs as go
 import json
 import base64
 import io
+import utils as utls
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -20,54 +21,6 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 server = app.server
 app.title = "KernelViz"
 demo_kernel = np.array([1, 2, 1])
-
-
-def add_dila_to_kernel(weights, dilation):
-    kernel_length = len(weights) + (len(weights) - 1) * dilation
-    kernel = np.zeros(kernel_length)
-    kernel_length = kernel.shape[0]
-    if dilation == 0:
-        kernel = weights
-    else:
-        sup = 0
-        for i in range(0, kernel_length, dilation + 1):
-            kernel[i] = weights[sup]
-            sup += 1
-    return kernel
-
-
-def apply_kernel(ts, kernel, bias, padding, stride):
-
-    # if padding > 0:
-    #     _input_length = len(ts)
-    #     _X = np.zeros(_input_length + (2 * padding))
-    #     _X[padding:(padding + _input_length)] = ts
-    #     X = _X
-
-    # Add padding to kernel
-    # kernel = add_dila_to_kernel(weights, dilation)
-
-    kernel_length = kernel.shape[0]
-
-    input_length = ts.shape[0]
-    length_diff = input_length - kernel_length
-    output_length = ((length_diff) // stride) + 1
-
-    output = np.empty(output_length)
-
-    for i in range(0, output_length):
-        _sum = bias
-        for j in range(0, kernel_length, stride):
-            s = kernel[j] * ts[i + j]
-            _sum += s
-            output[i] = _sum
-
-    return output
-
-
-def noramlize(ts):
-    ts = (ts-ts.mean())/ts.std()
-    return ts
 
 
 @app.callback(
@@ -89,7 +42,7 @@ def prepare_ts(ts_idx, chk_list, test_ts, data_json):
         ts = data[ts_idx]
 
     if 'norm' in chk_list:
-        ts = noramlize(ts)
+        ts = utls.noramlize(ts)
 
     return ts.to_json(orient='values')
 
@@ -117,7 +70,7 @@ def prepare_kernel(kernel, kc_ckhkb, dilation):
     if kc_ckhkb:
         mean = np.mean(kernel)
         kernel = kernel - mean
-    dila_kernel = add_dila_to_kernel(kernel, dilation)
+    dila_kernel = utls.add_dila_to_kernel(kernel, dilation)
     ret = {'original_kernel': kernel.tolist(),
            'dila_kernel': dila_kernel.tolist()}
     return json.dumps(ret)
@@ -151,7 +104,7 @@ def plot_trans_ts(json_data, kernel, bias, padding, stride):
     bias = float(bias)
     padding = int(padding)
     stride = int(stride)
-    transformed = apply_kernel(dff, kernel, bias, padding, stride)
+    transformed = utls.apply_kernel(dff, kernel, bias, padding, stride)
     layout = {'title': {'text':'Transformed time series'}}
     return go.Figure(data=[go.Scatter(y=transformed)], layout=layout)
 
