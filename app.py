@@ -133,7 +133,10 @@ def plot_kernel(kernel_json, ts_json, plot_with_dila):
 
 
 @app.callback(
-    Output(component_id='ts_trans_plot', component_property='figure'),
+    [Output(component_id='ts_trans_plot', component_property='figure'),
+     Output(component_id='ppv-value', component_property='children'),
+     Output(component_id='min-value', component_property='children'),
+     Output(component_id='max-value', component_property='children'),],
     [Input(component_id='current-TS', component_property='children'),
      Input(component_id='current-kernel', component_property='children'),
      Input(component_id='kernel_bias', component_property='value'),
@@ -152,7 +155,10 @@ def plot_trans_ts(json_data, kernel, bias, padding, stride):
     ts_length = dff.shape[0]
     layout = {'title': {'text': 'Transformed time series'},
               'xaxis': {'range': [0, ts_length]}}
-    return go.Figure(data=[go.Scatter(y=transformed)], layout=layout)
+    ppv = utls.ppv(transformed)
+    max_value = np.max(transformed)
+    min_value = np.min(transformed)
+    return go.Figure(data=[go.Scatter(y=transformed)], layout=layout), f"ppv = {ppv:.2f}", f"min = {min_value:.2f}", f"max = {max_value:.2f}"
 
 
 @app.callback(
@@ -333,7 +339,12 @@ app.layout = html.Div(children=[
     ], className="row"),
 
     html.Div([
-        html.Div(["t "], className="two columns"),
+        html.Div([
+            html.H6("Pooling values"),
+            html.Div(id="ppv-value"),
+            html.Div(id="max-value"),
+            html.Div(id="min-value"),
+        ], className="two columns"),
         html.Div([
             dcc.Graph(
                 id="ts_trans_plot")

@@ -47,3 +47,7 @@ def apply_kernel(ts, kernel, bias, padding, stride):
 def noramlize(ts):
     ts = (ts-ts.mean())/ts.std()
     return ts
+
+
+def ppv(ts):
+    return np.count_nonzero(ts > 0)/ts.shape[0]
