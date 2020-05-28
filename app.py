@@ -102,14 +102,34 @@ def prepare_kernel(kernel, kc_ckhkb, dilation):
 
 @app.callback(
     Output(component_id='kernel_plot', component_property='figure'),
-    [Input(component_id='current-kernel', component_property='children'),]
+    [Input(component_id='current-kernel', component_property='children'),
+     Input(component_id='current-TS', component_property='children'),
+     Input(component_id='kernel-plot-with-dila', component_property='on'),]
 )
-def plot_kernel(kernel_json):
+def plot_kernel(kernel_json, ts_json, plot_with_dila):
+    bar_scale = 0.01
+    margin = 0.1
     kernel_json = json.loads(kernel_json)
     kernel = np.array(kernel_json['original_kernel'])
     dila_kernel = np.array(kernel_json['dila_kernel'])
-    layout = {'title': {'text':f'Kernel: {kernel}\n Dilated kernel: {dila_kernel}'}}
-    return go.Figure(data=[go.Scatter(y=kernel)], layout=layout)
+
+    ts_length = pd.read_json(ts_json, orient='values').to_numpy().flatten().shape[0]
+
+    layout = {'title': {'text': f'Kernel: {kernel}\n Dilated kernel: {dila_kernel}'},
+              'xaxis': {'range': [-1, kernel.shape[0]+1]}}
+    if plot_with_dila:
+        layout = {'title': {'text': f'Dilated kernel: {dila_kernel}'},
+                  'xaxis': {'range':
+                            [-dila_kernel.shape[0]*margin,
+                             (dila_kernel.shape[0] - 1) + dila_kernel.shape[0]*margin]}}
+        fig = go.Figure(data=[go.Bar(y=dila_kernel, width=dila_kernel.shape[0] * bar_scale)], layout=layout)
+    else:
+        layout = {'title': {'text': f'Kernel: {kernel}'},
+                  'xaxis': {'range': 
+                            [-kernel.shape[0] * margin,
+                             (kernel.shape[0] - 1) + kernel.shape[0] * margin]}}
+        fig = go.Figure(data=[go.Bar(y=kernel, width=kernel.shape[0] * bar_scale)], layout=layout)
+    return fig
 
 
 @app.callback(
@@ -129,7 +149,9 @@ def plot_trans_ts(json_data, kernel, bias, padding, stride):
     padding = int(padding)
     stride = int(stride)
     transformed = utls.apply_kernel(dff, kernel, bias, padding, stride)
-    layout = {'title': {'text':'Transformed time series'}}
+    ts_length = dff.shape[0]
+    layout = {'title': {'text': 'Transformed time series'},
+              'xaxis': {'range': [0, ts_length]}}
     return go.Figure(data=[go.Scatter(y=transformed)], layout=layout)
 
 
@@ -256,6 +278,12 @@ app.layout = html.Div(children=[
                     id="kernel_centering_chkb",
                     on=False,
                     label='Center Kernel',
+                    style={'alignItems': 'flex-star'}
+                ),
+                daq.BooleanSwitch(
+                    id="kernel-plot-with-dila",
+                    on=False,
+                    label='Plot with dilation',
                     style={'alignItems': 'flex-star'}
                 ),
             ]),
