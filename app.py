@@ -140,21 +140,27 @@ def plot_kernel(kernel_json, ts_json, plot_with_dila):
     [Input(component_id='current-TS', component_property='children'),
      Input(component_id='current-kernel', component_property='children'),
      Input(component_id='kernel_bias', component_property='value'),
-     Input(component_id='kernel_padding', component_property='value'),
+     Input(component_id='kernel-padding-switch', component_property='on'),
      Input(component_id='kernel_stride', component_property='value'),
      ]
 )
-def plot_trans_ts(json_data, kernel, bias, padding, stride):
+def plot_trans_ts(json_data, kernel, bias, use_padding, stride):
 
     dff = pd.read_json(json_data, orient='values').to_numpy().flatten()
+    original_length = dff.shape[0]
     kernel = np.array(json.loads(kernel)['dila_kernel'])
     bias = float(bias)
-    padding = int(padding)
     stride = int(stride)
-    transformed = utls.apply_kernel(dff, kernel, bias, padding, stride)
-    ts_length = dff.shape[0]
+    if use_padding:
+        # add padding
+        padlen = len(kernel)//2
+        ts = np.zeros(len(dff) + 2* padlen)
+        ts[padlen:(padlen+len(dff))] = dff
+        dff = ts
+
+    transformed = utls.apply_kernel(dff, kernel, bias, stride)
     layout = {'title': {'text': 'Transformed time series'},
-              'xaxis': {'range': [0, ts_length]}}
+              'xaxis': {'range': [0, original_length]}}
     ppv = utls.ppv(transformed)
     max_value = np.max(transformed)
     min_value = np.min(transformed)
@@ -315,14 +321,14 @@ app.layout = html.Div(children=[
                 )]),
             # Kernel padding
             html.Div(children=[
-                html.H5(children='Padding (not impl.)'),
-                dcc.Input(
-                    id="kernel_padding",
-                    placeholder='Enter your padding',
-                    type='number',
-                    value='0',
-                    debounce=True
-                )]),
+                html.H5(children='Padding'),
+                daq.BooleanSwitch(
+                    id="kernel-padding-switch",
+                    on=False,
+                    label='Use zero padding',
+                    style={'alignItems': 'flex-star'}
+                ),
+            ]),
             # Kernel stride
             html.Div(children=[
                 html.H5(children='Stride'),

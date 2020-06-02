@@ -15,16 +15,7 @@ def add_dila_to_kernel(weights, dilation):
     return kernel
 
 
-def apply_kernel(ts, kernel, bias, padding, stride):
-
-    # if padding > 0:
-    #     _input_length = len(ts)
-    #     _X = np.zeros(_input_length + (2 * padding))
-    #     _X[padding:(padding + _input_length)] = ts
-    #     X = _X
-
-    # Add padding to kernel
-    # kernel = add_dila_to_kernel(weights, dilation)
+def apply_kernel(ts, kernel, bias, stride):
 
     kernel_length = kernel.shape[0]
 
